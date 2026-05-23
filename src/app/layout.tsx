@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { cn } from '@/lib/utils'
+import { APP_NAME } from '@/lib/constants'
 import {
   ClerkProvider,
   Show,
@@ -13,7 +14,26 @@ import {
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 
 export const metadata: Metadata = {
-  title: 'Modern Furniture E-commerce',
+  title: {
+    default: APP_NAME,
+    template: `%s | ${APP_NAME}`, // VD: "Sofa Gỗ Sồi | Luxe Furniture"
+  },
+  description:
+    'Nội thất hiện đại, chất lượng cao — thiết kế tinh tế cho không gian sống của bạn.',
+  keywords: [
+    'nội thất',
+    'furniture',
+    'sofa',
+    'bàn ghế',
+    'tủ kệ',
+    'scandinavian',
+  ],
+  openGraph: {
+    type: 'website',
+    locale: 'vi_VN',
+    url: process.env.NEXT_PUBLIC_APP_URL,
+    siteName: APP_NAME,
+  },
 }
 
 export default function RootLayout({

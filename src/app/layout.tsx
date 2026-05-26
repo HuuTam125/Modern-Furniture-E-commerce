@@ -1,4 +1,7 @@
+// src/app/layout.tsx
+
 import './globals.css'
+import { Providers } from '@/components/shared/providers'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { cn } from '@/lib/utils'
@@ -58,7 +61,7 @@ export default function RootLayout({
               <UserButton />
             </Show>
           </header>
-          {children}
+          <Providers>{children}</Providers>
         </ClerkProvider>
       </body>
     </html>

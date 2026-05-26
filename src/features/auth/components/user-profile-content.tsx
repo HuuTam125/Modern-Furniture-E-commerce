@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { formatDate } from '@/lib/utils'
+import { AddressList } from './address-list'
+
 interface UserProfileContentProps {
   user: User
 }
@@ -67,9 +69,9 @@ export function UserProfileContent({ user }: UserProfileContentProps) {
       </div>
 
       {/* Main: địa chỉ giao hàng */}
-      {/* <div className="md:col-span-2">
+      <div className="md:col-span-2">
         <AddressList userId={user.id} />
-      </div> */}
+      </div>
     </div>
   )
 }

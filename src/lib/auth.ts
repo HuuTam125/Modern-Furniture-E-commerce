@@ -26,3 +26,14 @@ export async function requireUser(): Promise<User> {
   if (!user) throw new Error('Unauthorized: Vui lòng đăng nhập')
   return user
 }
+
+/**
+ * Yêu cầu phải là ADMIN
+ * Dùng trong Server Actions của admin dashboard
+ */
+export async function requireAdmin(): Promise<User> {
+  const user = await requireUser()
+  if (user.role !== 'ADMIN')
+    throw new Error('Forbidden: Không có quyền truy cập')
+  return user
+}

@@ -255,3 +255,85 @@ export async function getRelatedProducts(
 
   return products as ProductCard[]
 }
+
+// ── Reviews của sản phẩm ────────────────────────────
+export async function getProductReviews(
+  productId: string,
+  page = 1,
+  perPage = 5,
+) {
+  const skip = (page - 1) * perPage
+
+  const [reviews, total, breakdown] = await Promise.all([
+    prisma.review.findMany({
+      where: { productId },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: perPage,
+      include: {
+        user: { select: { name: true, imageUrl: true } },
+      },
+    }),
+    prisma.review.count({ where: { productId } }),
+    // Đếm số review theo từng mức sao
+    prisma.review.groupBy({
+      by: ['rating'],
+      where: { productId },
+      _count: { rating: true },
+    }),
+  ])
+
+  // Format breakdown thành { 5: 10, 4: 5, 3: 2, 2: 1, 1: 0 }
+  const ratingMap = breakdown.reduce(
+    (acc, b) => {
+      acc[b.rating] = b._count.rating
+      return acc
+    },
+    {} as Record<number, number>,
+  )
+
+  const ratingBreakdown = {
+    5: ratingMap[5] ?? 0,
+    4: ratingMap[4] ?? 0,
+    3: ratingMap[3] ?? 0,
+    2: ratingMap[2] ?? 0,
+    1: ratingMap[1] ?? 0,
+  }
+
+  return {
+    reviews,
+    total,
+    totalPages: Math.ceil(total / perPage),
+    ratingBreakdown,
+  }
+}
+
+// ── Gợi ý tìm kiếm ───────────────────────────
+export async function searchProductSuggestions(query: string) {
+  if (!query || query.trim().length < 2) return []
+
+  return withCache(CACHE_KEYS.SEARCH(query), CACHE_TTL.SEARCH, async () => {
+    return prisma.product.findMany({
+      where: {
+        isPublished: true,
+        deletedAt: null,
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { tags: { some: { tag: { contains: query, mode: 'insensitive' } } } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        basePrice: true,
+        images: {
+          select: { url: true, altText: true },
+          orderBy: { position: 'asc' },
+          take: 1,
+        },
+      },
+      take: 6,
+    })
+  })
+}

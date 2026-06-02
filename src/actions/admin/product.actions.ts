@@ -6,6 +6,7 @@ import type { Product } from '@/generated/prisma/client'
 import { requireAdmin } from '@/lib/auth'
 import { productSchemaWithValidation } from '@/validations/product'
 import { revalidatePath } from 'next/cache'
+import { invalidateCache, CACHE_KEYS } from '@/lib/cache'
 import slugify from 'slugify'
 import z from 'zod'
 import prisma from '@/lib/prisma'
@@ -206,6 +207,9 @@ export async function updateProduct(
       return updated
     })
 
+    invalidateCache(CACHE_KEYS.PRODUCT(existing.slug))
+    if (slug !== existing.slug) await invalidateCache(CACHE_KEYS.PRODUCT(slug))
+
     revalidatePath('/dashboard/products')
     revalidatePath(`/product/${slug}`)
     revalidatePath('/products')
@@ -234,6 +238,8 @@ export async function deleteProduct(
       data: { deletedAt: new Date(), isPublished: false },
     })
 
+    invalidateCache(CACHE_KEYS.PRODUCT(product.slug))
+
     revalidatePath('/dashboard/products')
     revalidatePath('/products')
 
@@ -256,6 +262,8 @@ export async function toggleProductPublish(
       where: { id: productId },
       data: { isPublished },
     })
+
+    invalidateCache(CACHE_KEYS.PRODUCT(product.slug))
 
     revalidatePath('/dashboard/products')
     revalidatePath('/products')

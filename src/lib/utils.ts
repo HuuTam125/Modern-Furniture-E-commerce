@@ -17,3 +17,14 @@ export function formatDate(
     ...options,
   }).format(new Date(date))
 }
+
+/** Format giá tiền VND */
+export function formatPrice(
+  price: number | string | { toNumber: () => number },
+): string {
+  const num = typeof price === 'object' ? price.toNumber() : Number(price)
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+  }).format(num)
+}

@@ -2,6 +2,7 @@
 import { ProductCard } from './product-card'
 import type { ProductCard as ProductCardType } from '@/types/product'
 import type { PaginationMeta } from '@/types'
+import { ProductPagination } from './product-pagination'
 
 interface ProductGridProps {
   products: ProductCardType[]
@@ -29,6 +30,7 @@ export function ProductGrid({ products, meta }: ProductGridProps) {
           <ProductCard key={product.id} product={product} />
         ))}
       </div>
+      <ProductPagination meta={meta} />
     </div>
   )
 }

@@ -12,14 +12,47 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
 enum UserRole {
-  ADMIN
   CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING      // Chờ thanh toán
+  PROCESSING   // Đã thanh toán, đang xử lý
+  SHIPPED      // Đang giao hàng
+  DELIVERED    // Đã giao thành công
+  CANCELLED    // Đã hủy
+  REFUNDED     // Đã hoàn tiền
+}
+
+enum DiscountType {
+  PERCENTAGE   // Giảm theo %
+  FIXED        // Giảm số tiền cố định
+}
+
+enum FurnitureStyle {
+  SCANDINAVIAN
+  INDUSTRIAL
+  MINIMALIST
+  JAPANDI
+  BOHEMIAN
+  CONTEMPORARY
+}
+
+enum ShippingMethod {
+  STANDARD  // 3-5 ngày
+  EXPRESS   // 1-2 ngày
 }
 
 // ─────────────────────────────────────────
 // USER & AUTH
 // ─────────────────────────────────────────
+
 model User {
   id        String    @id @default(cuid())
   clerkId   String    @unique
@@ -34,7 +67,10 @@ model User {
 
   // Relations
   addresses    Address[]
-  
+  reviews      Review[]
+
+  @@index([clerkId])
+  @@index([email])
   @@map("users")
 }
 
@@ -55,4 +91,213 @@ model Address {
 
   @@index([userId])
   @@map("addresses")
+}
+
+// ─────────────────────────────────────────
+// CATEGORY
+// ─────────────────────────────────────────
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  imageUrl    String?
+  parentId    String?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Self-referencing (category tree)
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+
+  // Relations
+  products ProductCategory[]
+
+  @@index([slug])
+  @@index([parentId])
+  @@map("categories")
+}
+
+// ─────────────────────────────────────────
+// PRODUCT
+// ─────────────────────────────────────────
+
+model Product {
+  id            String         @id @default(cuid())
+  name          String
+  slug          String         @unique
+  shortDesc     String?        @db.VarChar(500)
+  description   String         @db.Text
+  basePrice     Decimal        @db.Decimal(12, 2) // Giá cơ bản (hiển thị "Từ X đ")
+  style         FurnitureStyle
+  isPublished   Boolean        @default(false)
+  isFeatured    Boolean        @default(false)
+  totalSold     Int            @default(0)        // Denormalized: cập nhật khi có DELIVERED order
+  averageRating Decimal        @default(0) @db.Decimal(3, 2) // Denormalized: 0.00–5.00
+  reviewCount   Int            @default(0)        // Denormalized
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?      // Soft delete
+
+  // Relations
+  images          ProductImage[]
+  variants        ProductVariant[]
+  categories      ProductCategory[]
+  tags            ProductTag[]
+  spec            ProductSpec?
+  reviews         Review[]
+  flashSaleItems  FlashSaleItem[]
+
+  @@index([slug])
+  @@index([isPublished, isFeatured])
+  @@index([isPublished, totalSold])
+  @@index([isPublished, averageRating])
+  @@index([style])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  url       String
+  altText   String?
+  position  Int      @default(0) // Thứ tự hiển thị (0 = ảnh chính)
+  createdAt DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, position])
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id         String   @id @default(cuid())
+  productId  String
+  sku        String   @unique
+  price      Decimal  @db.Decimal(12, 2)
+  stock      Int      @default(0)
+  // attributes: JSON lưu các thuộc tính của variant
+  // VD: { "color": "Oak", "colorHex": "#C4A882", "material": "Solid Wood", "size": "120cm" }
+  attributes Json
+  isDefault  Boolean  @default(false) // Variant mặc định được chọn khi vào PDP
+  imageUrl   String?  // Ảnh riêng cho variant này (optional)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([sku])
+  @@index([productId, isDefault])
+  @@map("product_variants")
+}
+
+model ProductCategory {
+  productId  String
+  categoryId String
+
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@map("product_categories")
+}
+
+model ProductTag {
+  id        String   @id @default(cuid())
+  productId String
+  tag       String   // VD: "Scandinavian", "Minimalist", "Living Room", "Bestseller"
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, tag])
+  @@index([productId])
+  @@index([tag])
+  @@map("product_tags")
+}
+
+model ProductSpec {
+  id               String   @id @default(cuid())
+  productId        String   @unique
+  widthCm          Decimal? @db.Decimal(8, 2)
+  depthCm          Decimal? @db.Decimal(8, 2)
+  heightCm         Decimal? @db.Decimal(8, 2)
+  weightKg         Decimal? @db.Decimal(8, 2)
+  primaryMaterial  String?  // VD: "Solid Ash Wood"
+  secondaryMaterial String? // VD: "Metal Legs"
+  origin           String?  // VD: "Vietnam", "Denmark"
+  careInstructions String?  @db.Text
+  warrantyInfo     String?  // VD: "2 năm bảo hành khung"
+  assemblyRequired Boolean  @default(true)
+  assemblyTime     String?  // VD: "30–45 phút"
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("product_specs")
+}
+
+// ─────────────────────────────────────────
+// REVIEW
+// ─────────────────────────────────────────
+
+model Review {
+  id               String   @id @default(cuid())
+  userId           String
+  productId        String
+  orderId          String   // Đơn hàng liên quan (để verify purchase)
+  rating           Int      // 1–5
+  title            String?  @db.VarChar(200)
+  content          String?  @db.Text
+  verifiedPurchase Boolean  @default(true)
+  images           String[] // Mảng URL ảnh (upload qua Uploadthing)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId]) // 1 user chỉ review 1 lần/sản phẩm
+  @@index([productId])
+  @@index([userId])
+  @@index([productId, rating])
+  @@map("reviews")
+}
+
+// ─────────────────────────────────────────
+// FLASH SALE
+// ─────────────────────────────────────────
+
+model FlashSale {
+  id        String    @id @default(cuid())
+  name      String
+  startAt   DateTime
+  endAt     DateTime
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  items FlashSaleItem[]
+
+  @@index([isActive, startAt, endAt])
+  @@map("flash_sales")
+}
+
+model FlashSaleItem {
+  id           String   @id @default(cuid())
+  flashSaleId  String
+  productId    String
+  salePrice    Decimal  @db.Decimal(12, 2) // Giá khuyến mãi
+  stockLimit   Int?     // Giới hạn số lượng trong flash sale (null = không giới hạn)
+  soldCount    Int      @default(0)
+
+  flashSale FlashSale @relation(fields: [flashSaleId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([flashSaleId, productId])
+  @@map("flash_sale_items")
 }

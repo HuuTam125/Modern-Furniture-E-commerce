@@ -45,3 +45,11 @@ export interface VariantAttributes {
   material?: string
   size?: string
 }
+
+// ── Admin product list item ──────────────────────────────────────
+export type AdminProductListItem = Product & {
+  images: Pick<ProductImage, 'url'>[]
+  categories: (ProductCategory & { category: Pick<Category, 'name'> })[]
+  variants: Pick<ProductVariant, 'id' | 'sku' | 'price' | 'stock'>[]
+  _count: { reviews: number }
+}
